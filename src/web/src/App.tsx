@@ -9,12 +9,25 @@ type Device = {
 }
 
 function App() {
-    const [ keys, setKeys ] = useState(["A#"]);
     const [ error, setError ] = useState<string>();
     const [ midi, setMidi ] = useState<any>();
     const [ devices, setDevices ] = useState<Device[]>();
     const [ selectedDevice, setSelectedDevice ] = useState<Device>();
-
+    const [ notes, setNotes ] = useState([
+        { note: "C", pressed: false },
+        { note: "C#", pressed: false },
+        { note: "D", pressed: false },
+        { note: "D#", pressed: false },
+        { note: "E", pressed: false },
+        { note: "F", pressed: false },
+        { note: "F#", pressed: false },
+        { note: "G", pressed: false },
+        { note: "G#", pressed: false },
+        { note: "A", pressed: false },
+        { note: "A#", pressed: false },
+        { note: "B", pressed: false }
+    ]);
+    
     function connectTo(device) {
         setSelectedDevice(device);
         midi.inputs.forEach((input) => {
@@ -42,11 +55,15 @@ function App() {
     }
     
     function releaseNote(note) {
-        console.log(`Released note ${note}`);
+        const copy = [...notes];
+        copy[note % 12].pressed = false;
+        setNotes(copy);
     }
     
     function pressNote(note) {
-        console.log(`Pressed note ${note}`);
+        const copy = [...notes];
+        copy[note % 12].pressed = true;
+        setNotes(copy);
     }
     
     useEffect(() => {
@@ -81,7 +98,9 @@ function App() {
             <h2>Failed to get MIDI access.</h2>
             <p>Reset the MIDI device control permission in your browser and try again.</p>
         </>}
-        {keys.map((key, i) => <h2 key={`key-${i}`}>{key}</h2>)}
+        <h2>
+            {notes.filter((x) => x.pressed).map((x) => ` ${x.note}`)}
+        </h2>
     </>);
 }
 
