@@ -8,12 +8,52 @@ type Device = {
     name: string;
 }
 
+
+const notes = [ "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" ];
+const scales = {
+    major: [ 0, 2, 4, 5, 7, 9, 11 ],
+    minor: [ 0, 2, 3, 5, 7, 8, 10 ]
+};
+
+function getPossibleScales(noteStates: NoteState[]) {
+    if (noteStates.length === 0) {
+        return [];
+    }
+    
+    const activeNotes = noteStates
+        .filter(x => x.pressed)
+        .map(x => x.note);
+    const possibleScales: {rootNote: string, scaleName: string}[] = [];
+    
+    for (const [ scaleName, intervals ] of Object.entries(scales)) {
+        for (const rootNote of notes) {
+            // Get the notes in the scale
+            const rootIndex = notes.indexOf(rootNote);
+            const scaleNotes = intervals.map(interval => notes[(rootIndex + interval) % notes.length]);
+           
+            if (activeNotes.every(note => scaleNotes.includes(note))) {
+                possibleScales.push({
+                    rootNote,
+                    scaleName
+                });
+            }
+        }
+    }
+    
+    return possibleScales;
+}
+
+type NoteState = {
+    note: string;
+    pressed: boolean;
+}
+
 function App() {
     const [ error, setError ] = useState<string>();
     const [ midi, setMidi ] = useState<any>();
     const [ devices, setDevices ] = useState<Device[]>();
     const [ selectedDevice, setSelectedDevice ] = useState<Device>();
-    const [ notes, setNotes ] = useState([
+    const [ noteStates, setNoteStates ] = useState<NoteState[]>([
         { note: "C", pressed: false },
         { note: "C#", pressed: false },
         { note: "D", pressed: false },
@@ -27,6 +67,8 @@ function App() {
         { note: "A#", pressed: false },
         { note: "B", pressed: false }
     ]);
+    const [ recordedNoteStates, setRecordedNoteStates ] = useState<NoteState[]>([]);
+    const [ possibleScales, setPossibleScales ] = useState<{ rootNote: string, scaleName: string }[]>([]);
     
     function connectTo(device) {
         setSelectedDevice(device);
@@ -55,15 +97,41 @@ function App() {
     }
     
     function releaseNote(note) {
-        const copy = [...notes];
-        copy[note % 12].pressed = false;
-        setNotes(copy);
+        setNoteStates(previousState => {
+            const newState = [...previousState];
+            newState[note % 12].pressed = false;
+            return newState;
+        });
     }
     
-    function pressNote(note) {
-        const copy = [...notes];
-        copy[note % 12].pressed = true;
-        setNotes(copy);
+    function pressNote(noteData: number) {
+        const note = notes[noteData % 12];
+        setNoteStates(previousState => {
+            const newState = [...previousState];
+            newState[noteData % 12].pressed = true;
+            return newState;
+        })
+        // record the note
+        setRecordedNoteStates(previousState => {
+            if (previousState.every(x => x.note !== note)) {
+                const newState = [
+                    ...previousState,
+                    {
+                        note,
+                        pressed: true
+                    }
+                ];
+                setPossibleScales(getPossibleScales(newState));
+                return newState;
+            } else {
+                return previousState;
+            }
+        });
+    }
+    
+    function clearRecordedNotes() {
+        setRecordedNoteStates([]);
+        setPossibleScales(getPossibleScales([]));
     }
     
     useEffect(() => {
@@ -85,6 +153,10 @@ function App() {
             .then(onSuccess, setError);
     }, []);
     
+    // Order by note (C to B)
+    const orderedRecordedNoteStates = [...recordedNoteStates]
+        .sort((a, b) => notes.indexOf(a.note) - notes.indexOf(b.note));
+    
     return (<>
         <h1>Skalez</h1>
         {!midi && !error && <p>Allow access to your MIDI device to continue.</p>}
@@ -99,8 +171,15 @@ function App() {
             <p>Reset the MIDI device control permission in your browser and try again.</p>
         </>}
         <h2>
-            {notes.filter((x) => x.pressed).map((x) => ` ${x.note}`)}
+            Pressed: {noteStates.filter((x) => x.pressed).map((x) => ` ${x.note}`)}
         </h2>
+        <h2>
+            Recorded: {orderedRecordedNoteStates.map((x) => ` ${x.note}`)} <button onClick={clearRecordedNotes}>Clear</button>
+        </h2>
+        <h2>Possible scales:</h2>
+        <ul>
+            {possibleScales.map((scale, i) => <li key={`scale-${i}`}>{scale.rootNote} {scale.scaleName}</li>)}
+        </ul>
     </>);
 }
 
