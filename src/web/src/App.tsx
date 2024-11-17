@@ -2,50 +2,12 @@ import {useEffect, useState} from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
+import {playNote, stopNote} from "./AudioEngine.ts";
+import {getChord, getPossibleScales, notes, NoteState} from "./MusicTheory.ts";
 
 type Device = {
     id: string;
     name: string;
-}
-
-
-const notes = [ "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" ];
-const scales = {
-    major: [ 0, 2, 4, 5, 7, 9, 11 ],
-    minor: [ 0, 2, 3, 5, 7, 8, 10 ]
-};
-
-function getPossibleScales(noteStates: NoteState[]) {
-    if (noteStates.length === 0) {
-        return [];
-    }
-    
-    const activeNotes = noteStates
-        .filter(x => x.pressed)
-        .map(x => x.note);
-    const possibleScales: {rootNote: string, scaleName: string}[] = [];
-    
-    for (const [ scaleName, intervals ] of Object.entries(scales)) {
-        for (const rootNote of notes) {
-            // Get the notes in the scale
-            const rootIndex = notes.indexOf(rootNote);
-            const scaleNotes = intervals.map(interval => notes[(rootIndex + interval) % notes.length]);
-           
-            if (activeNotes.every(note => scaleNotes.includes(note))) {
-                possibleScales.push({
-                    rootNote,
-                    scaleName
-                });
-            }
-        }
-    }
-    
-    return possibleScales;
-}
-
-type NoteState = {
-    note: string;
-    pressed: boolean;
 }
 
 function App() {
@@ -78,6 +40,14 @@ function App() {
             }
         });
     }
+    
+    function disconnect() {
+        midi.inputs.forEach((input) => {
+            input.onmidimessage = null;
+        });
+        setSelectedDevice(null);
+    }
+    
     function onMidiMessage(event) {
         const command = event.data[0];
         const note = event.data[1];
@@ -92,19 +62,20 @@ function App() {
         if (velocity === 0) {
             releaseNote(note);
         } else {
-            pressNote(note);
+            pressNote(note, velocity);
         }
     }
     
-    function releaseNote(note) {
+    function releaseNote(noteData) {
         setNoteStates(previousState => {
             const newState = [...previousState];
-            newState[note % 12].pressed = false;
+            newState[noteData % 12].pressed = false;
             return newState;
         });
+        stopNote(noteData);
     }
     
-    function pressNote(noteData: number) {
+    function pressNote(noteData: number, velocity: number) {
         const note = notes[noteData % 12];
         setNoteStates(previousState => {
             const newState = [...previousState];
@@ -127,6 +98,7 @@ function App() {
                 return previousState;
             }
         });
+        playNote(noteData, 127);
     }
     
     function clearRecordedNotes() {
@@ -157,29 +129,51 @@ function App() {
     const orderedRecordedNoteStates = [...recordedNoteStates]
         .sort((a, b) => notes.indexOf(a.note) - notes.indexOf(b.note));
     
+    const currentChord = getChord(noteStates);
+    
     return (<>
         <h1>Skalez</h1>
         {!midi && !error && <p>Allow access to your MIDI device to continue.</p>}
-        {devices && !selectedDevice && devices.map((device) => (
-            <p key={`input-${device.id}`}>
-                {device.name} <button onClick={() => connectTo(device)}>Connect</button>
-            </p>
-        ))}
-        {selectedDevice && <p>Connected to {selectedDevice.name}</p>}
+        {devices && !selectedDevice && (<>
+            <p>Select your device:</p>
+            <table>
+                <tbody>
+                    {devices.map((device) => (
+                        <tr key={`device-${device.id}`}>
+                            <td>{device.name}</td>
+                            <td><button onClick={() => connectTo(device)}>Connect</button></td>
+                        </tr>
+                    ))}                
+                </tbody>
+            </table>
+        </>)}
         {error && <>
             <h2>Failed to get MIDI access.</h2>
             <p>Reset the MIDI device control permission in your browser and try again.</p>
         </>}
-        <h2>
-            Pressed: {noteStates.filter((x) => x.pressed).map((x) => ` ${x.note}`)}
-        </h2>
-        <h2>
-            Recorded: {orderedRecordedNoteStates.map((x) => ` ${x.note}`)} <button onClick={clearRecordedNotes}>Clear</button>
-        </h2>
-        <h2>Possible scales:</h2>
-        <ul>
-            {possibleScales.map((scale, i) => <li key={`scale-${i}`}>{scale.rootNote} {scale.scaleName}</li>)}
-        </ul>
+
+        {selectedDevice && (<>
+            <p>Connected to {selectedDevice.name} <button onClick={disconnect}>Disconnect</button></p>
+            <h2>
+                Pressed: {noteStates.filter((x) => x.pressed).map((x) => ` ${x.note}`)}
+            </h2>
+            <h2>
+                {!currentChord && "No chord pressed"}
+                {currentChord}
+            </h2>
+            <h2>
+                Recorded:
+                {orderedRecordedNoteStates.map((x) => ` ${x.note}`)}
+            </h2>
+            <button onClick={clearRecordedNotes}>Clear</button>
+            {possibleScales.length === 0 && <h2>Press notes to see possible scales</h2>}
+            {possibleScales.length > 0 && (<>
+                <h2>Possible scales:</h2>
+                <ul>
+                    {possibleScales.map((scale, i) => <li key={`scale-${i}`}>{scale.rootNote} {scale.scaleName}</li>)}
+                </ul>
+            </>)}
+        </>)}
     </>);
 }
 
