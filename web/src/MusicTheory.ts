@@ -67,7 +67,7 @@ export function getPossibleScales(noteStates: NoteState[]) {
     return possibleScales;
 }
 
-export function getChord(noteStates) {
+export function getChord(noteStates: NoteState[]) {
     const pressedNoteValues = noteStates
         .filter(x => x.pressed)
         .map(x => notes.indexOf(x.note));

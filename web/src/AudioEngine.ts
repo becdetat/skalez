@@ -1,5 +1,5 @@
-const activeOscillators = {};
-let audioContext;
+const activeOscillators: any = {};
+let audioContext: any;
 
 export function playNote(note: number, velocity: number) {
     audioContext = audioContext || new ((window as any).AudioContext || (window as any).webkitAudioContext)();

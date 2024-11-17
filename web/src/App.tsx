@@ -1,6 +1,4 @@
 import {useEffect, useState} from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
 import {playNote, stopNote} from "./AudioEngine.ts";
 import {getChord, getPossibleScales, notes, NoteState} from "./MusicTheory.ts";
@@ -14,7 +12,7 @@ function App() {
     const [ error, setError ] = useState<string>();
     const [ midi, setMidi ] = useState<any>();
     const [ devices, setDevices ] = useState<Device[]>();
-    const [ selectedDevice, setSelectedDevice ] = useState<Device>();
+    const [ selectedDevice, setSelectedDevice ] = useState<Device | null>();
     const [ noteStates, setNoteStates ] = useState<NoteState[]>([
         { note: "C", pressed: false },
         { note: "C#", pressed: false },
@@ -32,9 +30,9 @@ function App() {
     const [ recordedNoteStates, setRecordedNoteStates ] = useState<NoteState[]>([]);
     const [ possibleScales, setPossibleScales ] = useState<{ rootNote: string, scaleName: string }[]>([]);
     
-    function connectTo(device) {
+    function connectTo(device: Device) {
         setSelectedDevice(device);
-        midi.inputs.forEach((input) => {
+        midi.inputs.forEach((input: MIDIInput) => {
             if (input.id === device.id) {
                 input.onmidimessage = onMidiMessage;
             }
@@ -42,13 +40,13 @@ function App() {
     }
     
     function disconnect() {
-        midi.inputs.forEach((input) => {
+        midi.inputs.forEach((input: MIDIInput) => {
             input.onmidimessage = null;
         });
         setSelectedDevice(null);
     }
     
-    function onMidiMessage(event) {
+    function onMidiMessage(event: any) {
         const command = event.data[0];
         const note = event.data[1];
         const velocity = event.data[2];
@@ -66,7 +64,7 @@ function App() {
         }
     }
     
-    function releaseNote(noteData) {
+    function releaseNote(noteData: number) {
         setNoteStates(previousState => {
             const newState = [...previousState];
             newState[noteData % 12].pressed = false;
@@ -98,7 +96,7 @@ function App() {
                 return previousState;
             }
         });
-        playNote(noteData, 127);
+        playNote(noteData, velocity);
     }
     
     function clearRecordedNotes() {
@@ -114,7 +112,7 @@ function App() {
             midiAccess.inputs.forEach((input) => {
                 devicesArray.push({
                     id: input.id,
-                    name: input.name
+                    name: input.name ?? ""
                 })
             });
             setDevices(devicesArray);
