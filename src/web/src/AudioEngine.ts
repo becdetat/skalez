@@ -16,15 +16,15 @@ export function playNote(note: number, velocity: number) {
     };
     
     // Normalise the gain for each note being played so it totals 1.0 (otherwise it distorts)
-    const adjustedGain = 1.0 / Object.keys(activeOscillators).length;
+    const adjustedGain = 0.95 / Object.keys(activeOscillators).length;
     for (const key in activeOscillators) {
         activeOscillators[key].gainNode.gain.setValueAtTime(adjustedGain, audioContext.currentTime);
     }
 
-    oscillator.type = "sine";
+    oscillator.type = "triangle";
     oscillator.frequency.setValueAtTime(getFrequencyForNote(note), audioContext.currentTime);
     oscillator
-        .connect(getLowPassFilter(2000))
+        .connect(getLowPassFilter(1500))
         .connect(gainNode)
         .connect(getCompressor(-30))
         .connect(audioContext.destination);
